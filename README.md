@@ -36,3 +36,6 @@ Kod mógłby zostać udoskonalony poprzez dodanie możliwości wprowadzania argu
 
 ### Skalowanie silne
 Testy przeprowadzono na części pliku wielkości 6GB.
+
+![obraz](https://github.com/szymanskip2299/filter_json/assets/56300609/533922b0-129f-4333-86c4-af08ca31e0cf)
+
