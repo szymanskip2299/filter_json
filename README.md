@@ -32,10 +32,62 @@ do wybrania ilości wątków.
 
 ### Możliwe udoskonalenia kodu
 
-Kod mógłby zostać udoskonalony poprzez dodanie możliwości wprowadzania argumentów przy pomocy lini komend bez kompilacji, w tym umożliwienie specyfikacji warunków filtorwania, np. z pomocą składni SQL(warto tutaj zwrócić uwagę, że wykorzystanie zwykłych narzędzi do wprowadzenia pliku json do bazy danych nie są owocne, gdzyż atrybuty references oraz authors są listami a zatem nie mogą być bezpośrednio umieszczone w tabeli). Dodatkowo ponieważ kod wymaga kilku sekcji krytycznych, co wpływa na szybkość wykonania programu przy wielu wątkach, program mógłby zostać przyspieszony poprzez umożliwienie wątkom na prace nad kolejnami liniami kody w trakcie gdy sekcja krytyczna jest zablokowana przez inny wątek.
+Ponieważ kod wymaga kilku sekcji krytycznych, co wpływa na szybkość wykonania programu przy wielu wątkach, program mógłby zostać przyspieszony poprzez umożliwienie wątkom na prace nad kolejnami liniami kody w trakcie gdy sekcja krytyczna jest zablokowana przez inny wątek. Możnaby to osiągnąć poprzez zamienienie sekcji krytycznych przez lock, a następnie zamiast natychmiast próbować do niego wejść sprawdzić czy jest zamknięty i jeśli tak to zapisywanie obiektu jline np. do kolejki, a następnie kontunuowanie działania programu. Gdy wątek następnym razem uzyska dostęp do locku przeprowadza działania również dla obiektów jline w kolejce. Oczywiście rozmiar kolejki musiałby być ograniczony aby nie zabierać zbyt dużo pamięci, wtedy wątek normalnie czeka na otwarcie locka.
 
 ### Skalowanie silne
 Testy przeprowadzono na części pliku wielkości 6GB.
 
-![obraz](https://github.com/szymanskip2299/filter_json/assets/56300609/533922b0-129f-4333-86c4-af08ca31e0cf)
+![obraz](https://github.com/szymanskip2299/filter_json/assets/56300609/ec0fff6a-5e4d-4491-b182-cb10148f6cc1)
 
+
+### Skalowanie słabe
+Testy przeprowadzono na części pliku wielkości 2GB razy liczba wątków.
+
+![obraz](https://github.com/szymanskip2299/filter_json/assets/56300609/f71d500d-47aa-47c4-8c2e-ba4ecf0e9bff)
+
+### Wycieki pamięci
+Program został przetestowany pod kątem wycieków pamięci z wykorzystaniem narzędzia Valgrind. Poniżej przedstawiono wynik z tego narzędzia.
+```
+==4326== Memcheck, a memory error detector
+==4326== Copyright (C) 2002-2015, and GNU GPL'd, by Julian Seward et al.
+==4326== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
+==4326== Command: ./filter_json
+==4326== 
+1073741824
+134213881
+268429996
+402641029
+536857231
+671072256
+805287849
+939503860
+1073721130
+# COMPUTATION TIME: 1185.716433 sec
+==4326== 
+==4326== HEAP SUMMARY:
+==4326==     in use at exit: 76,928 bytes in 10 blocks
+==4326==   total heap usage: 130,466,086 allocs, 130,466,076 frees, 9,075,786,870 bytes allocated
+==4326== 
+==4326== 1,520 bytes in 5 blocks are possibly lost in loss record 4 of 6
+==4326==    at 0x4C2FB55: calloc (in /usr/lib/valgrind/vgpreload_memcheck-amd64-linux.so)
+==4326==    by 0x40138E4: allocate_dtv (dl-tls.c:322)
+==4326==    by 0x40138E4: _dl_allocate_tls (dl-tls.c:539)
+==4326==    by 0x55FC26E: allocate_stack (allocatestack.c:588)
+==4326==    by 0x55FC26E: pthread_create@@GLIBC_2.2.5 (pthread_create.c:539)
+==4326==    by 0x51CB99F: ??? (in /usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0)
+==4326==    by 0x51C7CB9: GOMP_parallel (in /usr/lib/x86_64-linux-gnu/libgomp.so.1.0.0)
+==4326==    by 0x402A5A: main (in /home/vboxuser/Desktop/proj/filter_json)
+==4326== 
+==4326== LEAK SUMMARY:
+==4326==    definitely lost: 0 bytes in 0 blocks
+==4326==    indirectly lost: 0 bytes in 0 blocks
+==4326==      possibly lost: 1,520 bytes in 5 blocks
+==4326==    still reachable: 75,408 bytes in 5 blocks
+==4326==         suppressed: 0 bytes in 0 blocks
+==4326== Reachable blocks (those to which a pointer was found) are not shown.
+==4326== To see them, rerun with: --leak-check=full --show-leak-kinds=all
+==4326== 
+==4326== For counts of detected and suppressed errors, rerun with: -v
+==4326== ERROR SUMMARY: 1 errors from 1 contexts (suppressed: 0 from 0)
+```
+Narzędzie znalazło potencjalny wyciek pamięci wynikający z użycia openMP (funkcja GOMP_parallel), natomiast są to najprawodpodobniej fałszywe pozytywy (na podstawie np. https://github.com/dmlc/xgboost/issues/8238). Ponadto przeprowadzenie tego samego testu na mniejszej ilości danych prowadziło do identycznej liczby potencjalnie straconych bajtów. Oznacza to, że najprawdopodobniej program nie ma żadnych wycieków pamięci, a w najgorszym nie stanowi zagrożenia nawet dla bardzo dużej ilości danych wejściowych i długiego czasu działania.
